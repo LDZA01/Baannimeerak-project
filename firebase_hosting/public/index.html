@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baannimeerak Dashboard</title>
+  <!-- Firebase SDK -->
+  <script defer src="/__/firebase/11.0.2/firebase-app-compat.js"></script>
+  <script defer src="/__/firebase/11.0.2/firebase-storage-compat.js"></script>
+  <script defer src="/__/firebase/init.js"></script>
+
+  <style>
+    /* General page styles */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f7fc;
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+
+    h1 {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    #current-datetime {
+      text-align: right;
+      padding: 10px;
+      font-size: 16px;
+      color: #333;
+    }
+
+    /* Dashboard styles */
+    .dashboard {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+    }
+
+    /* Individual card styles */
+    .card {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      width: 250px;
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    /* Heading and paragraph inside the card */
+    .card h2 {
+      color: #333;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    .card p {
+      font-size: 16px;
+      color: #555;
+      margin-bottom: 10px;
+    }
+
+    /* Style for image container */
+    #image-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 30px;
+    }
+
+    #firebase-image-container {
+      position: relative;
+    }
+
+    #firebase-image {
+      max-width: 90%;
+      max-height: 600px;
+      width: auto;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      object-fit: contain;
+      margin: 0 auto;
+    }
+
+    #firebase-image-timestamp {
+      background-color: rgba(0, 0, 0, 0.5);
+      color: white;
+      padding: 4px 8px;
+      font-size: 14px;
+      border-radius: 4px;
+      position: absolute;
+      top: 10px;
+      left: 10px;
+    }
+
+    /* Error message styling for images */
+    #error-message {
+      color: red;
+      font-size: 16px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Baannimeerak Dashboard</h1>
+
+  <div id="current-datetime">
+    <!-- JavaScript will update this -->
+  </div>
+
+  <div class="container">
+    <div class="dashboard">
+      <!-- Sensor Data Cards -->
+      <div class="card" id="humidity-card">
+        <h2>🌡️ Humidity</h2>
+        <p id="humidity">Loading...</p>
+      </div>
+      <div class="card" id="temperature-card">
+        <h2>🌡️ Temperature</h2>
+        <p id="temperature">Loading...</p>
+      </div>
+      <div class="card" id="light-val-card">
+        <h2>💡 Garage Light</h2>
+        <p id="light_val">Loading...</p>
+      </div>
+      <div class="card" id="sound-val-card">
+        <h2>🔊 Bedroom Light</h2>
+        <p id="sound_val">Loading...</p>
+      </div>
+      <div class="card" id="rain-val-card">
+        <h2>☔ Clothes Drying</h2>
+        <p id="rain_val">Loading...</p>
+      </div>
+    </div>
+
+    <!-- Image from Firebase -->
+    <div class="card" id="image-container">
+      <h2>📸 Image from Esp32-Cam</h2>
+      <div id="firebase-image-container">
+        <p id="firebase-image-timestamp"></p>
+        <img id="firebase-image" alt="Image from Firebase" />
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ** 1. Update current date and time **
+    function updateDateTime() {
+      const now = new Date();
+      const formattedDateTime = now.toLocaleString(); // Format as "MM/DD/YYYY, HH:mm:ss"
+      document.getElementById('current-datetime').textContent = formattedDateTime;
+    }
+    // Update every second
+    setInterval(updateDateTime, 1000);
+    updateDateTime();
+
+    
+    const apiUrl = "https://api.netpie.io/v2/device/shadow/data?alias=test01";
+    const apiKey = "Device d38031c6-2cb0-4ced-9646-b03da1d63af0:1ZkE2P3W6DYMJkjrSSwykvtDNvdx7mMY";
+
+    let lastSoundStatus = "off";
+
+    async function fetchSensorData() {
+      try {
+        const response = await fetch(apiUrl, {
+          headers: {
+            'Authorization': apiKey
+          }
+        });
+        if (!response.ok) throw new Error("Failed to fetch sensor data");
+        const data = await response.json();
+    
+        
+        document.getElementById('humidity').textContent = data.data.Humidity + " %";
+        document.getElementById('temperature').textContent = data.data.Temperature + " °C";
+        
+        
+        const rainValue = data.data.Rain_val;
+        document.getElementById('rain_val').textContent = rainValue < 3900 ? "on" : "off";
+    
+        
+        const lightValue = data.data.LIGHT_Val;
+        document.getElementById('light_val').textContent = lightValue > 3500 ? "on" : "off";
+
+        
+        const soundValue = data.data.Sound_Val;
+        if (soundValue > 2500) {
+          lastSoundStatus = lastSoundStatus === "off" ? "on" : "off";
+        }
+        document.getElementById('sound_val').textContent = lastSoundStatus;
+    
+      } catch (error) {
+        console.error("Error fetching sensor data:", error);
+        document.getElementById('humidity').textContent = "Error";
+        document.getElementById('temperature').textContent = "Error";
+        document.getElementById('rain_val').textContent = "Error";
+        document.getElementById('light_val').textContent = "Error";
+        document.getElementById('sound_val').textContent = "Error";
+      }
+    }
+    
+    
+    setInterval(fetchSensorData, 5000);
+    fetchSensorData();
+
+    //Firebase storage img
+    document.addEventListener('DOMContentLoaded', function () {
+      const storage = firebase.storage();
+      const storageRef = storage.ref('data/photo.jpg'); // Path to the image in Firebase Storage
+
+      storageRef.getDownloadURL()
+        .then((url) => {
+          // Display the image in the img tag
+          document.getElementById('firebase-image').src = url;
+
+          // Get the upload timestamp and display it
+          storageRef.getMetadata()
+            .then((metadata) => {
+              const uploadTimestamp = metadata.timeCreated;
+              const formattedTimestamp = new Date(uploadTimestamp).toLocaleString();
+              document.getElementById('firebase-image-timestamp').textContent = `Uploaded on ${formattedTimestamp}`;
+            })
+            .catch((error) => {
+              console.error("Error fetching image metadata:", error);
+              document.getElementById('firebase-image-timestamp').textContent = "Unable to get upload timestamp";
+            });
+        })
+        .catch((error) => {
+          console.error("Error fetching image:", error);
+          document.getElementById('firebase-image').style.display = 'none'; // Hide image if error
+        });
+    });
+  </script>
+</body>
+</html>
